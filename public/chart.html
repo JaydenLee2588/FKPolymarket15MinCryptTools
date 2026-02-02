@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Polymarket BTC 15m 实时图表</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 10px;
+      color: #58a6ff;
+    }
+
+    .chart-container {
+      width: 100%;
+      max-width: 1200px;
+      height: 500px;
+      background: #161b22;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .legend {
+      display: flex;
+      gap: 30px;
+      margin-top: 15px;
+      font-size: 0.9rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .legend-color {
+      width: 20px;
+      height: 4px;
+      border-radius: 2px;
+    }
+
+    .legend-ta {
+      background: #3fb950;
+    }
+
+    .legend-market {
+      background: #f0883e;
+    }
+
+    .status {
+      margin-top: 15px;
+      font-size: 0.85rem;
+      color: #8b949e;
+    }
+
+    .status.connected {
+      color: #3fb950;
+    }
+
+    .status.disconnected {
+      color: #f85149;
+    }
+
+    /* Dashboard Styles */
+    .dashboard {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      max-width: 1200px;
+      margin-bottom: 15px;
+    }
+
+    .dashboard-section {
+      background: #161b22;
+      border-radius: 8px;
+      padding: 15px;
+      min-width: 280px;
+      flex: 1;
+      border: 1px solid #30363d;
+    }
+
+    .dashboard-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #58a6ff;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .dashboard-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      font-size: 0.85rem;
+    }
+
+    .dashboard-row .label {
+      color: #8b949e;
+    }
+
+    .green {
+      color: #3fb950;
+    }
+
+    .red {
+      color: #f85149;
+    }
+
+    .yellow {
+      color: #d29922;
+    }
+
+    .white {
+      color: #c9d1d9;
+    }
+
+    .gray {
+      color: #8b949e;
+    }
+
+    /* Pattern Panel Compact Styles */
+    .pattern-summary {
+      font-size: 0.8rem;
+      color: #8b949e;
+      margin-bottom: 6px;
+      padding: 4px 8px;
+      background: #21262d;
+      border-radius: 4px;
+    }
+
+    .pattern-name-inline {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .signal-bullish {
+      color: #3fb950;
+    }
+
+    .signal-bearish {
+      color: #f85149;
+    }
+
+    .signal-neutral {
+      color: #d29922;
+    }
+
+    .signal-wait {
+      color: #8b949e;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>📊 Polymarket BTC 15m 实时图表</h1>
+
+  <!-- Dashboard Panel -->
+  <div class="dashboard">
+    <div class="dashboard-section">
+      <div class="dashboard-title">技术分析</div>
+      <div class="dashboard-row">
+        <span class="label">预测价格:</span>
+        <span id="ta-predict"><span class="green">看涨 -¢</span> | <span class="red">看跌 -¢</span></span>
+      </div>
+      <div class="dashboard-row">
+        <span class="label">平均K线:</span>
+        <span id="heiken">-</span>
+      </div>
+      <div class="dashboard-row">
+        <span class="label">RSI强弱:</span>
+        <span id="rsi">-</span>
+      </div>
+      <div class="dashboard-row">
+        <span class="label">MACD趋势:</span>
+        <span id="macd">-</span>
+      </div>
+      <div class="dashboard-row">
+        <span class="label">1m/3m 涨跌:</span>
+        <span id="delta">-</span>
+      </div>
+    </div>
+
+    <div class="dashboard-section">
+      <div class="dashboard-title">Poly 市场</div>
+      <div class="dashboard-row">
+        <span class="label">市场价格:</span>
+        <span id="poly-price"><span class="green">买涨 -¢</span> | <span class="red">买跌 -¢</span></span>
+      </div>
+      <div class="dashboard-row">
+        <span class="label">流动性:</span>
+        <span id="liquidity">-</span>
+      </div>
+      <div class="dashboard-row">
+        <span class="label">结算倒计时:</span>
+        <span id="countdown">-</span>
+      </div>
+      <div class="dashboard-row">
+        <span class="label">初始价格:</span>
+        <span id="price-beat">-</span>
+      </div>
+      <div class="dashboard-row">
+        <span class="label">当前价格:</span>
+        <span id="current-price">-</span>
+      </div>
+    </div>
+
+    <div class="dashboard-section">
+      <div class="dashboard-title">参考价格</div>
+      <div class="dashboard-row">
+        <span class="label">BTC(币安):</span>
+        <span id="binance-price">-</span>
+      </div>
+      <div class="dashboard-row">
+        <span class="label">VWAP均价:</span>
+        <span id="vwap">-</span>
+      </div>
+      <div class="dashboard-row">
+        <span class="label">美东|盘口:</span>
+        <span id="session">-</span>
+      </div>
+    </div>
+
+    <!-- Pattern Detection Panel (in same row) -->
+    <div class="dashboard-section">
+      <div class="dashboard-title">形态检测</div>
+      <div class="pattern-summary" id="pattern-summary">-</div>
+      <div class="dashboard-row">
+        <span class="label">信号类型:</span>
+        <span id="signal-type">-</span>
+      </div>
+      <div class="dashboard-row">
+        <span class="label">预测趋势:</span>
+        <span id="predicted-trend">-</span>
+      </div>
+      <div class="dashboard-row">
+        <span class="label">操作建议:</span>
+        <span id="action-suggestion">-</span>
+      </div>
+      <div class="dashboard-row">
+        <span class="label">推荐入场:</span>
+        <span id="recommend-entry">-</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-container">
+    <canvas id="priceChart"></canvas>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-color legend-ta"></div>
+      <span>技术预测 (看涨概率)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color legend-market"></div>
+      <span>Polymarket 买涨价格</span>
+    </div>
+  </div>
+
+  <div id="status" class="status disconnected">● 未连接</div>
+
+  <script>
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    const statusEl = document.getElementById('status');
+
+    const taData = [];
+    const marketData = [];
+    const MAX_POINTS = 1200; // 20分钟 @ 1秒间隔
+
+    const chart = new Chart(ctx, {
+      type: 'line',
+      plugins: [{
+        id: 'horizontalLine',
+        afterDraw: (chart) => {
+          const { ctx, chartArea: { left, right }, scales: { y } } = chart;
+          const yValue = y.getPixelForValue(0.5);
+
+          if (yValue) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(left, yValue);
+            ctx.lineTo(right, yValue);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'; // 亮白色
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+      }],
+      data: {
+        datasets: [
+          {
+            label: '技术预测',
+            data: taData,
+            borderColor: '#3fb950',
+            backgroundColor: 'rgba(63, 185, 80, 0.1)',
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.2,
+            fill: false
+          },
+          {
+            label: 'Polymarket',
+            data: marketData,
+            borderColor: '#f0883e',
+            backgroundColor: 'rgba(240, 136, 62, 0.1)',
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.2,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: {
+          intersect: false,
+          mode: 'index'
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: {
+              unit: 'minute',
+              displayFormats: { minute: 'HH:mm' }
+            },
+            grid: {
+              color: (context) => {
+                const date = new Date(context.tick?.value);
+                const minutes = date.getMinutes();
+                if (minutes === 0 || minutes === 15 || minutes === 30 || minutes === 45) {
+                  return '#484f58';
+                }
+                return '#21262d';
+              },
+              lineWidth: (context) => {
+                const date = new Date(context.tick?.value);
+                const minutes = date.getMinutes();
+                if (minutes === 0 || minutes === 15 || minutes === 30 || minutes === 45) {
+                  return 2;
+                }
+                return 1;
+              }
+            },
+            ticks: { color: '#8b949e' }
+          },
+          y: {
+            min: 0,
+            max: 1,
+            ticks: {
+              stepSize: 0.02,
+              color: '#8b949e',
+              callback: (value) => value.toFixed(2)
+            },
+            grid: { color: '#21262d' }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#161b22',
+            borderColor: '#30363d',
+            borderWidth: 1,
+            titleColor: '#c9d1d9',
+            bodyColor: '#c9d1d9',
+            callbacks: {
+              label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(3)}`
+            }
+          }
+        }
+      }
+    });
+
+    function connect() {
+      const ws = new WebSocket(`ws://${location.host}`);
+
+      ws.onopen = () => {
+        statusEl.textContent = '● 已连接';
+        statusEl.className = 'status connected';
+      };
+
+      ws.onclose = () => {
+        statusEl.textContent = '● 已断开 (重连中...)';
+        statusEl.className = 'status disconnected';
+        setTimeout(connect, 2000);
+      };
+
+      ws.onerror = () => ws.close();
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          const point = { x: data.timestamp, y: data.taPrediction };
+          const marketPoint = { x: data.timestamp, y: data.marketPrice };
+
+          taData.push(point);
+          marketData.push(marketPoint);
+
+          if (taData.length > MAX_POINTS) taData.shift();
+          if (marketData.length > MAX_POINTS) marketData.shift();
+
+          chart.update('none');
+
+          // Update dashboard
+          updateDashboard(data);
+        } catch (e) {
+          console.error('Parse error:', e);
+        }
+      };
+    }
+
+    // Helper functions
+    function formatNum(n, decimals = 0) {
+      if (n == null || !Number.isFinite(n)) return '-';
+      return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    }
+
+    function formatPct(n, decimals = 0) {
+      if (n == null || !Number.isFinite(n)) return '-';
+      return (n * 100).toFixed(decimals) + '%';
+    }
+
+    function formatTime(min) {
+      if (min == null) return '-';
+      const m = Math.floor(min);
+      const s = Math.round((min - m) * 60);
+      return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function updateDashboard(data) {
+      // 预测价格 (显示为 cents)
+      const taUp = data.taPrediction != null ? (data.taPrediction * 100).toFixed(0) : '-';
+      const taDown = data.taDown != null ? (data.taDown * 100).toFixed(0) : '-';
+      document.getElementById('ta-predict').innerHTML =
+        `<span class="green">看涨 ${taUp}¢</span> | <span class="red">看跌 ${taDown}¢</span>`;
+
+      // 平均K线
+      const hColor = data.heikenColor?.toLowerCase();
+      const heikenText = hColor === 'green' ? '涨(绿)' : hColor === 'red' ? '跌(红)' : '-';
+      const heikenClass = hColor === 'green' ? 'green' : hColor === 'red' ? 'red' : 'gray';
+      document.getElementById('heiken').innerHTML =
+        `<span class="${heikenClass}">${heikenText}</span> x${data.heikenCount ?? '-'}`;
+
+      // RSI (红绿色标识)
+      const rsiVal = data.rsi != null ? data.rsi.toFixed(1) : '-';
+      const rsiArrow = data.rsiSlope > 0 ? '↑' : data.rsiSlope < 0 ? '↓' : '';
+      const rsiClass = data.rsi > 50 ? 'green' : data.rsi < 50 ? 'red' : 'gray';
+      document.getElementById('rsi').innerHTML = `<span class="${rsiClass}">${rsiVal} ${rsiArrow}</span>`;
+
+      // MACD
+      let macdText = '-';
+      if (data.macdHist != null) {
+        const trend = data.macdHist < 0 ? '看空' : '看多';
+        const strength = (data.macdHistDelta != null &&
+          ((data.macdHist < 0 && data.macdHistDelta < 0) ||
+            (data.macdHist > 0 && data.macdHistDelta > 0))) ? ' (增强)' : '';
+        macdText = trend + strength;
+      }
+      const macdClass = data.macdHist < 0 ? 'red' : data.macdHist > 0 ? 'green' : 'gray';
+      document.getElementById('macd').innerHTML = `<span class="${macdClass}">${macdText}</span>`;
+
+      // 1m/3m 涨跌
+      const d1 = data.delta1m != null ? `${data.delta1m >= 0 ? '+' : ''}$${data.delta1m.toFixed(2)}` : '-';
+      const d3 = data.delta3m != null ? `${data.delta3m >= 0 ? '+' : ''}$${data.delta3m.toFixed(2)}` : '-';
+      const d1Class = data.delta1m > 0 ? 'green' : data.delta1m < 0 ? 'red' : 'gray';
+      const d3Class = data.delta3m > 0 ? 'green' : data.delta3m < 0 ? 'red' : 'gray';
+      document.getElementById('delta').innerHTML =
+        `<span class="${d1Class}">${d1}</span> | <span class="${d3Class}">${d3}</span>`;
+
+      // VWAP (红绿色标识 - 现在在参考价格区)
+      const vwapVal = formatNum(data.vwap, 0);
+      const vwapPct = data.vwapDist != null ? `(${formatPct(data.vwapDist, 2)})` : '';
+      const vwapClass = data.vwapDist > 0 ? 'green' : data.vwapDist < 0 ? 'red' : 'gray';
+      document.getElementById('vwap').innerHTML = `<span class="${vwapClass}">${vwapVal} ${vwapPct}</span>`;
+
+      // 市场价格 (显示为整数 cents)
+      const mUp = data.marketPrice != null ? (data.marketPrice * 100).toFixed(0) : '-';
+      const mDown = data.marketDown != null ? (data.marketDown * 100).toFixed(0) : '-';
+      document.getElementById('poly-price').innerHTML =
+        `<span class="green">买涨 ${mUp}¢</span> | <span class="red">买跌 ${mDown}¢</span>`;
+
+      // 流动性
+      document.getElementById('liquidity').textContent = formatNum(data.liquidity, 0);
+
+      // 结算倒计时
+      const countdownEl = document.getElementById('countdown');
+      const cdMin = data.settlementLeftMin;
+      const cdClass = cdMin >= 10 ? 'green' : cdMin >= 5 ? 'yellow' : cdMin >= 0 ? 'red' : 'gray';
+      countdownEl.innerHTML = `<span class="${cdClass}">${formatTime(cdMin)}</span>`;
+
+      // 初始价格 (统一使用2位小数)
+      document.getElementById('price-beat').textContent =
+        data.priceToBeat != null ? `$${formatNum(data.priceToBeat, 2)}` : '-';
+
+      // 当前价格 (含涨跌对比)
+      const curPrice = data.currentPrice;
+      const initPrice = data.priceToBeat;
+      if (curPrice != null) {
+        let priceHtml = `$${formatNum(curPrice, 2)}`;
+        if (initPrice != null && Number.isFinite(initPrice) && initPrice !== 0) {
+          const delta = curPrice - initPrice;
+          const deltaPct = (delta / initPrice) * 100;
+          const sign = delta >= 0 ? '+' : '';
+          const priceClass = delta > 0 ? 'green' : delta < 0 ? 'red' : 'gray';
+          priceHtml = `<span class="${priceClass}">$${formatNum(curPrice, 2)} (${sign}$${Math.abs(delta).toFixed(2)}) (${sign}${deltaPct.toFixed(2)}%)</span>`;
+        }
+        document.getElementById('current-price').innerHTML = priceHtml;
+      } else {
+        document.getElementById('current-price').textContent = '-';
+      }
+
+      // 币安价格
+      document.getElementById('binance-price').textContent =
+        data.binancePrice != null ? `$${formatNum(data.binancePrice, 0)}` : '-';
+
+      // 时间和盘口
+      document.getElementById('session').textContent =
+        `${data.etTime || '-'} | ${data.session || '-'}`;
+
+      // 形态检测数据
+      updatePatternDisplay(data.pattern);
+    }
+
+    function updatePatternDisplay(pattern) {
+      if (!pattern) return;
+
+      // 根据信号类型确定颜色类
+      const signalType = pattern.signalType || '';
+      let signalClass = 'signal-wait';
+      if (signalType.includes('顺势多') || signalType.includes('反转多')) {
+        signalClass = 'signal-bullish';
+      } else if (signalType.includes('顺势空') || signalType.includes('反转空')) {
+        signalClass = 'signal-bearish';
+      } else if (signalType.includes('震荡')) {
+        signalClass = 'signal-neutral';
+      }
+
+      // 形态概况 (合并: 形态名称 + VWAP位置 + MACD状态 + RSI状态)
+      const summaryEl = document.getElementById('pattern-summary');
+      const patternName = pattern.patternName || '-';
+      const vwapPos = pattern.vwapPosition || '-';
+      const macdStatus = pattern.macdStatus || '-';
+      const rsiStatus = pattern.rsiStatus || '-';
+      // 注意：这里移除了 ${signalClass}，让形态名称默认显示（白色）
+      summaryEl.innerHTML = `<span class="pattern-name-inline">${patternName}</span> | ${vwapPos} | ${macdStatus} | RSI ${rsiStatus}`;
+
+      // 信号类型 - 强制白色
+      const signalTypeEl = document.getElementById('signal-type');
+      signalTypeEl.textContent = pattern.signalType || '-';
+      signalTypeEl.className = ''; // 移除所有颜色类，默认继承 dashboard-row 的白色
+
+      // 预测趋势 (涨=红色, 跌=绿色, 其他=白色)
+      const trendEl = document.getElementById('predicted-trend');
+      const trend = pattern.predictedTrend || '-';
+      trendEl.textContent = trend;
+      // 包含涨/触底/反弹 = 红色(买涨), 包含跌/变盘 = 绿色(买跌), 其他 = 白色
+      if (trend.includes('涨') || trend.includes('触底') || trend.includes('反弹')) {
+        trendEl.className = 'red';
+      } else if (trend.includes('跌') || trend.includes('变盘')) {
+        trendEl.className = 'green';
+      } else {
+        trendEl.className = 'white';
+      }
+
+      // 操作建议 (买涨=红色, 买跌=绿色, 观望=白色)
+      const actionEl = document.getElementById('action-suggestion');
+      const action = pattern.actionSuggestion || '-';
+      actionEl.textContent = action;
+      if (action.includes('买涨')) {
+        actionEl.className = 'red';
+      } else if (action.includes('买跌')) {
+        actionEl.className = 'green';
+      } else {
+        actionEl.className = 'white';
+      }
+
+      // 推荐入场
+      const recommendEl = document.getElementById('recommend-entry');
+      const recommend = pattern.recommendEntry || '-';
+      recommendEl.textContent = recommend;
+      if (recommend.includes('强烈推荐')) {
+        recommendEl.className = 'green';
+      } else if (recommend.includes('推荐') && !recommend.includes('不推荐')) {
+        recommendEl.className = 'green';
+      } else if (recommend.includes('⚠️')) {
+        recommendEl.className = 'yellow';
+      } else {
+        recommendEl.className = 'red';
+      }
+    }
+
+    connect();
+  </script>
+</body>
+
+</html>

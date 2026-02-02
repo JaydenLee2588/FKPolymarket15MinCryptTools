@@ -1,49 +1,49 @@
-# Polymarket BTC 15m Assistant
+# Polymarket BTC 15m 助手
 
-A real-time console trading assistant for Polymarket **"Bitcoin Up or Down" 15-minute** markets.
+一个用于 Polymarket **"Bitcoin Up or Down" 15分钟** 市场的实时控制台交易助手。
 
-It combines:
-- Polymarket market selection + UP/DOWN prices + liquidity
-- Polymarket live WS **Chainlink BTC/USD CURRENT PRICE** (same feed shown on the Polymarket UI)
-- Fallback to on-chain Chainlink (Polygon) via HTTP/WSS RPC
-- Binance spot price for reference
-- Short-term TA snapshot (Heiken Ashi, RSI, MACD, VWAP, Delta 1/3m)
-- A simple live **Predict (LONG/SHORT %)** derived from the assistant’s current TA scoring
+它结合了：
+- Polymarket 市场筛选 + 看涨/看跌 (UP/DOWN) 价格 + 流动性
+- Polymarket 实时 WS **Chainlink BTC/USD 当前价格** (与 Polymarket UI 上显示的源相同)
+- 通过 HTTP/WSS RPC 回退到链上 Chainlink (Polygon) 数据
+- 币安 (Binance) 现货价格作为参考
+- 短期技术分析快照 (平均烛图 Heiken Ashi, RSI, MACD, VWAP, Delta 1/3m)
+- 一个简单的实时 **预测 (多/空 %)**，源自助手当前的技术分析评分
 
-## Requirements
+## 环境要求
 
 - Node.js **18+** (https://nodejs.org/en)
-- npm (comes with Node)
+- npm (通常随 Node 一起安装)
 
 
-## Run from terminal (step-by-step)
+## 从终端运行 (分步指南)
 
-### 1) Clone the repository
+### 1) 克隆代码库
 
 ```bash
 git clone https://github.com/FrondEnt/PolymarketBTC15mAssistant.git
 ```
 
-Alternative (no git):
+替代方案 (不使用 git):
 
-- Click the green `<> Code` button on GitHub
-- Choose `Download ZIP`
-- Extract the ZIP
-- Open a terminal in the extracted project folder
+- 点击 GitHub 上的绿色 `<> Code` 按钮
+- 选择 `Download ZIP`
+- 解压 ZIP 文件
+- 在解压后的项目文件夹中打开终端
 
-Then open a terminal in the project folder.
+然后在项目文件夹中打开终端。
 
-### 2) Install dependencies
+### 2) 安装依赖
 
 ```bash
 npm install
 ```
 
-### 3) (Optional) Set environment variables
+### 3) (可选) 设置环境变量
 
-You can run without extra config (defaults are included), but for more stable Chainlink fallback it’s recommended to set at least one Polygon RPC.
+你可以无需额外配置直接运行 (内置了默认值)，但为了更稳定的 Chainlink 回退机制，建议至少配置一个 Polygon RPC。
 
-#### Windows PowerShell (current terminal session)
+#### Windows PowerShell (当前终端会话)
 
 ```powershell
 $env:POLYGON_RPC_URL = "https://polygon-rpc.com"
@@ -51,14 +51,14 @@ $env:POLYGON_RPC_URLS = "https://polygon-rpc.com,https://rpc.ankr.com/polygon"
 $env:POLYGON_WSS_URLS = "wss://polygon-bor-rpc.publicnode.com"
 ```
 
-Optional Polymarket settings:
+可选的 Polymarket 设置:
 
 ```powershell
 $env:POLYMARKET_AUTO_SELECT_LATEST = "true"
-# $env:POLYMARKET_SLUG = "btc-updown-15m-..."   # pin a specific market
+# $env:POLYMARKET_SLUG = "btc-updown-15m-..."   # 锁定特定市场
 ```
 
-#### Windows CMD (current terminal session)
+#### Windows CMD (当前终端会话)
 
 ```cmd
 set POLYGON_RPC_URL=https://polygon-rpc.com
@@ -66,64 +66,64 @@ set POLYGON_RPC_URLS=https://polygon-rpc.com,https://rpc.ankr.com/polygon
 set POLYGON_WSS_URLS=wss://polygon-bor-rpc.publicnode.com
 ```
 
-Optional Polymarket settings:
+可选的 Polymarket 设置:
 
 ```cmd
 set POLYMARKET_AUTO_SELECT_LATEST=true
 REM set POLYMARKET_SLUG=btc-updown-15m-...
 ```
 
-Notes:
-- These environment variables apply only to the current terminal window.
-- If you want permanent env vars, set them via Windows System Environment Variables or use a `.env` loader of your choice.
+注意:
+- 这些环境变量仅适用于当前终端窗口。
+- 如果你需要永久生效的环境变量，请通过 Windows 系统环境变量设置，或使用你喜欢的 `.env` 加载器。
 
-## Configuration
+## 配置
 
-This project reads configuration from environment variables.
+本项目从环境变量中读取配置。
 
-You can set them in your shell, or create a `.env` file and load it using your preferred method.
+你可以在 shell 中设置它们，或者创建一个 `.env` 文件并使用你喜欢的方法加载它。
 
 ### Polymarket
 
-- `POLYMARKET_AUTO_SELECT_LATEST` (default: `true`)
-  - When `true`, automatically picks the latest 15m market.
-- `POLYMARKET_SERIES_ID` (default: `10192`)
-- `POLYMARKET_SERIES_SLUG` (default: `btc-up-or-down-15m`)
-- `POLYMARKET_SLUG` (optional)
-  - If set, the assistant will target a specific market slug.
-- `POLYMARKET_LIVE_WS_URL` (default: `wss://ws-live-data.polymarket.com`)
+- `POLYMARKET_AUTO_SELECT_LATEST` (默认: `true`)
+  - 当为 `true` 时，自动选择最新的 15分钟市场。
+- `POLYMARKET_SERIES_ID` (默认: `10192`)
+- `POLYMARKET_SERIES_SLUG` (默认: `btc-up-or-down-15m`)
+- `POLYMARKET_SLUG` (可选)
+  - 如果设置，助手将锁定特定的市场 slug。
+- `POLYMARKET_LIVE_WS_URL` (默认: `wss://ws-live-data.polymarket.com`)
 
-### Chainlink on Polygon (fallback)
+### Polygon 上的 Chainlink (回退机制)
 
 - `CHAINLINK_BTC_USD_AGGREGATOR`
-  - Default: `0xc907E116054Ad103354f2D350FD2514433D57F6f`
+  - 默认: `0xc907E116054Ad103354f2D350FD2514433D57F6f`
 
 HTTP RPC:
-- `POLYGON_RPC_URL` (default: `https://polygon-rpc.com`)
-- `POLYGON_RPC_URLS` (optional, comma-separated)
-  - Example: `https://polygon-rpc.com,https://rpc.ankr.com/polygon`
+- `POLYGON_RPC_URL` (默认: `https://polygon-rpc.com`)
+- `POLYGON_RPC_URLS` (可选，逗号分隔)
+  - 示例: `https://polygon-rpc.com,https://rpc.ankr.com/polygon`
 
-WSS RPC (optional but recommended for more real-time fallback):
-- `POLYGON_WSS_URL` (optional)
-- `POLYGON_WSS_URLS` (optional, comma-separated)
+WSS RPC (可选，但推荐用于更实时的回退):
+- `POLYGON_WSS_URL` (可选)
+- `POLYGON_WSS_URLS` (可选，逗号分隔)
 
-### Proxy support
+### 代理支持 (Proxy)
 
-The bot supports HTTP(S) proxies for both HTTP requests (fetch) and WebSocket connections.
+本机器人支持 HTTP(S) 代理，用于 HTTP 请求 (fetch) 和 WebSocket 连接。
 
-Supported env vars (standard):
+支持的环境变量 (标准):
 
 - `HTTPS_PROXY` / `https_proxy`
 - `HTTP_PROXY` / `http_proxy`
 - `ALL_PROXY` / `all_proxy`
 
-Examples:
+示例:
 
 PowerShell:
 
 ```powershell
 $env:HTTPS_PROXY = "http://127.0.0.1:8080"
-# or
+# 或者
 $env:ALL_PROXY = "socks5://127.0.0.1:1080"
 ```
 
@@ -131,22 +131,22 @@ CMD:
 
 ```cmd
 set HTTPS_PROXY=http://127.0.0.1:8080
-REM or
+REM 或者
 set ALL_PROXY=socks5://127.0.0.1:1080
 ```
 
-#### Proxy with username + password (simple guide)
+#### 带用户名 + 密码的代理 (简易指南)
 
-1) Take your proxy host and port (example: `1.2.3.4:8080`).
+1) 获取你的代理主机和端口 (例如: `1.2.3.4:8080`)。
 
-2) Add your login and password in the URL:
+2) 将你的登录名和密码添加到 URL 中:
 
-- HTTP/HTTPS proxy:
+- HTTP/HTTPS 代理:
   - `http://USERNAME:PASSWORD@HOST:PORT`
-- SOCKS5 proxy:
+- SOCKS5 代理:
   - `socks5://USERNAME:PASSWORD@HOST:PORT`
 
-3) Set it in the terminal and run the bot.
+3) 在终端中设置并运行机器人。
 
 PowerShell:
 
@@ -162,25 +162,24 @@ set HTTPS_PROXY=http://USERNAME:PASSWORD@HOST:PORT
 npm start
 ```
 
-Important: if your password contains special characters like `@` or `:` you must URL-encode it.
+重要提示: 如果你的密码包含特殊字符，如 `@` 或 `:`，你必须对其进行 URL 编码。
 
-Example:
+示例:
+- 密码: `p@ss:word`
+- 编码后: `p%40ss%3Aword`
+- 代理 URL: `http://user:p%40ss%3Aword@1.2.3.4:8080`
 
-- password: `p@ss:word`
-- encoded: `p%40ss%3Aword`
-- proxy URL: `http://user:p%40ss%3Aword@1.2.3.4:8080`
-
-## Run
+## 运行
 
 ```bash
 npm start
 ```
 
-### Stop
+### 停止
 
-Press `Ctrl + C` in the terminal.
+在终端中按 `Ctrl + C`。
 
-### Update to latest version
+### 更新到最新版本
 
 ```bash
 git pull
@@ -188,16 +187,16 @@ npm install
 npm start
 ```
 
-## Notes / Troubleshooting
+## 注意事项 / 故障排除
 
-- If you see no Chainlink updates:
-  - Polymarket WS might be temporarily unavailable. The bot falls back to Chainlink on-chain price via Polygon RPC.
-  - Ensure at least one working Polygon RPC URL is configured.
-- If the console looks like it “spams” lines:
-  - The renderer uses `readline.cursorTo` + `clearScreenDown` for a stable, static screen, but some terminals may still behave differently.
+- 如果你看不到 Chainlink 更新:
+  - Polymarket WS 可能暂时不可用。机器人会通过 Polygon RPC 回退到 Chainlink 链上价格。
+  - 确保至少配置了一个可用的 Polygon RPC URL。
+- 如果控制台看起来像是在“刷屏”:
+  - 渲染器使用 `readline.cursorTo` + `clearScreenDown` 来保持屏幕稳定静止，但某些终端可能表现不同。
 
-## Safety
+## 安全声明
 
-This is not financial advice. Use at your own risk.
+这不是财务建议。使用风险自负。
 
 created by @krajekis
