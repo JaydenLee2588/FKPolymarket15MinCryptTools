@@ -141,6 +141,14 @@
       color: #8b949e;
     }
 
+    .dark-gray {
+      color: #484f58;
+    }
+
+    .white {
+      color: #ffffff;
+    }
+
     /* Pattern Panel Compact Styles */
     .pattern-summary {
       font-size: 0.8rem;
@@ -289,7 +297,7 @@
 
     const taData = [];
     const marketData = [];
-    const MAX_POINTS = 1200; // 20分钟 @ 1秒间隔
+    const MAX_POINTS = 600; // 30分钟 @ 3秒间隔
 
     const chart = new Chart(ctx, {
       type: 'line',
@@ -470,13 +478,17 @@
       // RSI (红绿色标识)
       const rsiVal = data.rsi != null ? data.rsi.toFixed(1) : '-';
       const rsiArrow = data.rsiSlope > 0 ? '↑' : data.rsiSlope < 0 ? '↓' : '';
-      const rsiClass = data.rsi > 50 ? 'green' : data.rsi < 50 ? 'red' : 'gray';
+      // 修改：<30暗灰, 30-70灰, >70亮白
+      let rsiClass = 'gray';
+      if (data.rsi < 30) rsiClass = 'dark-gray';
+      else if (data.rsi > 70) rsiClass = 'white';
+
       document.getElementById('rsi').innerHTML = `<span class="${rsiClass}">${rsiVal} ${rsiArrow}</span>`;
 
       // MACD
       let macdText = '-';
       if (data.macdHist != null) {
-        const trend = data.macdHist < 0 ? '看空' : '看多';
+        const trend = data.macdHist < 0 ? '看跌' : '看涨';
         const strength = (data.macdHistDelta != null &&
           ((data.macdHist < 0 && data.macdHistDelta < 0) ||
             (data.macdHist > 0 && data.macdHistDelta > 0))) ? ' (增强)' : '';
@@ -511,7 +523,7 @@
       // 结算倒计时
       const countdownEl = document.getElementById('countdown');
       const cdMin = data.settlementLeftMin;
-      const cdClass = cdMin >= 10 ? 'green' : cdMin >= 5 ? 'yellow' : cdMin >= 0 ? 'red' : 'gray';
+      const cdClass = cdMin >= 10 ? 'white' : cdMin >= 5 ? 'white' : cdMin >= 0 ? 'white' : 'gray';
       countdownEl.innerHTML = `<span class="${cdClass}">${formatTime(cdMin)}</span>`;
 
       // 初始价格 (统一使用2位小数)
@@ -575,43 +587,40 @@
       signalTypeEl.textContent = pattern.signalType || '-';
       signalTypeEl.className = ''; // 移除所有颜色类，默认继承 dashboard-row 的白色
 
-      // 预测趋势 (涨=红色, 跌=绿色, 其他=白色)
+      // 预测趋势 (涨=绿色, 跌=红色, 其他=白色)
       const trendEl = document.getElementById('predicted-trend');
       const trend = pattern.predictedTrend || '-';
       trendEl.textContent = trend;
-      // 包含涨/触底/反弹 = 红色(买涨), 包含跌/变盘 = 绿色(买跌), 其他 = 白色
+
       if (trend.includes('涨') || trend.includes('触底') || trend.includes('反弹')) {
-        trendEl.className = 'red';
-      } else if (trend.includes('跌') || trend.includes('变盘')) {
         trendEl.className = 'green';
+      } else if (trend.includes('跌') || trend.includes('变盘')) {
+        trendEl.className = 'red';
       } else {
         trendEl.className = 'white';
       }
 
-      // 操作建议 (买涨=红色, 买跌=绿色, 观望=白色)
+      // 操作建议 (买涨=绿色, 买跌=红色, 观望=白色)
       const actionEl = document.getElementById('action-suggestion');
       const action = pattern.actionSuggestion || '-';
       actionEl.textContent = action;
       if (action.includes('买涨')) {
-        actionEl.className = 'red';
-      } else if (action.includes('买跌')) {
         actionEl.className = 'green';
+      } else if (action.includes('买跌')) {
+        actionEl.className = 'red';
       } else {
         actionEl.className = 'white';
       }
 
-      // 推荐入场
+      // 推荐入场 (强烈推荐/推荐=黄色, 其他=白色)
       const recommendEl = document.getElementById('recommend-entry');
       const recommend = pattern.recommendEntry || '-';
       recommendEl.textContent = recommend;
-      if (recommend.includes('强烈推荐')) {
-        recommendEl.className = 'green';
-      } else if (recommend.includes('推荐') && !recommend.includes('不推荐')) {
-        recommendEl.className = 'green';
-      } else if (recommend.includes('⚠️')) {
+
+      if (recommend.includes('推荐') && !recommend.includes('不推荐')) {
         recommendEl.className = 'yellow';
       } else {
-        recommendEl.className = 'red';
+        recommendEl.className = 'white';
       }
     }
 

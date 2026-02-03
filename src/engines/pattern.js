@@ -131,7 +131,7 @@ function getMacdStatus(macd) {
         return { text: '零轴下方', code: 'below_zero' };
     }
 
-    return { text: hist > 0 ? '看多' : '看空', code: 'neutral' };
+    return { text: hist > 0 ? '看涨' : '看跌', code: 'neutral' };
 }
 
 /**

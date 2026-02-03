@@ -27,6 +27,15 @@ import path from "node:path";
 import readline from "node:readline";
 import { applyGlobalProxyFromEnv } from "./net/proxy.js";
 import { startChartServer, broadcastChartData } from "./server.js";
+import {
+  checkEntry,
+  executeBuy,
+  checkExit,
+  executeSell,
+  handleSettlement,
+  onNewRound,
+  getPositions
+} from "./engines/simulator.js";
 
 function countVwapCrosses(closes, vwapSeries, lookback) {
   if (closes.length < lookback || vwapSeries.length < lookback) return null;
@@ -395,6 +404,8 @@ async function main() {
   const chainlinkStream = startChainlinkPriceStream({});
 
   let priceToBeatState = { slug: null, value: null, setAtMs: null };
+  // 预测偏移量：每15分钟开始时记录，用于强制预测从50%起始
+  let predictionOffset = { slug: null, offset: 0 };
 
   const header = [
     "timestamp",
@@ -491,23 +502,47 @@ async function main() {
       const marketSlug = poly.ok ? String(poly.market?.slug ?? "") : "";
       const marketStartMs = poly.ok && poly.market?.eventStartTime ? new Date(poly.market.eventStartTime).getTime() : null;
 
+      // 检测是否为新合约
+      let isNewMarket = false;
       if (marketSlug && priceToBeatState.slug !== marketSlug) {
         priceToBeatState = { slug: marketSlug, value: null, setAtMs: null };
+        isNewMarket = true;
+        console.log(`[NewMarket] Detected new market: ${marketSlug}`);
       }
 
       // 使用 Polymarket 市场数据中的 priceToBeat，而不是 Chainlink 当前价格
       if (priceToBeatState.slug && priceToBeatState.value === null && poly.ok && poly.market) {
         const nowMs = Date.now();
         const okToLatch = marketStartMs === null ? true : nowMs >= marketStartMs;
+
         if (okToLatch) {
-          const polyPriceToBeat = priceToBeatFromPolymarketMarket(poly.market);
-          if (polyPriceToBeat !== null) {
-            priceToBeatState = { slug: priceToBeatState.slug, value: Number(polyPriceToBeat), setAtMs: nowMs };
+          // 1. 尝试从 API 数据提取
+          let foundPrice = priceToBeatFromPolymarketMarket(poly.market);
+
+          // 2. 如果 API 没给 (比如 Up/Down 市场描述说"以开始时价格为准")
+          // 且我们确实处于刚开始阶段 (比如开始后1分钟内)，或者是全新发现的市场
+          // 那么就以当前的 Chainlink 价格作为锁定的行权价
+          if (foundPrice === null && currentPrice !== null) {
+            console.log(`[StrikePrice] API did not provide strike price. Latching current Chainlink price: $${currentPrice}`);
+            foundPrice = currentPrice;
+          }
+
+          if (foundPrice !== null) {
+            priceToBeatState = { slug: priceToBeatState.slug, value: Number(foundPrice), setAtMs: nowMs };
+            console.log(`[StrikePrice] Locked priceToBeat: ${priceToBeatState.value}`);
+          } else {
+            // Debug: 还是拿不到价格
+            // console.log(`[Debug] Failed to extract priceToBeat...`);
           }
         }
       }
 
       const priceToBeat = priceToBeatState.slug === marketSlug ? priceToBeatState.value : null;
+
+      // Debug: 输出预测相关的关键变量
+      if (isNewMarket) {
+        console.log(`[Debug] New round - priceToBeat: ${priceToBeat}, binancePrice: ${lastPrice}, diff: ${priceToBeat ? (lastPrice - priceToBeat).toFixed(2) : 'N/A'}`);
+      }
 
 
       const regimeInfo = detectRegime({
@@ -535,11 +570,38 @@ async function main() {
 
       const timeAware = applyTimeAwareness(scored.rawUp, timeLeftMin, CONFIG.candleWindowMinutes);
 
+      // 获取市场价格
       const marketUp = poly.ok ? poly.prices.up : null;
       const marketDown = poly.ok ? poly.prices.down : null;
-      const edge = computeEdge({ modelUp: timeAware.adjustedUp, modelDown: timeAware.adjustedDown, marketYes: marketUp, marketNo: marketDown });
 
-      const rec = decide({ remainingMinutes: timeLeftMin, edgeUp: edge.edgeUp, edgeDown: edge.edgeDown, modelUp: timeAware.adjustedUp, modelDown: timeAware.adjustedDown });
+      // ===== 预测偏移校准 =====
+      // 仅在市场刚开始的一瞬间（30秒内）进行校准，确保起始点为50%
+      if (isNewMarket && marketSlug) {
+        const now = Date.now();
+        const elapsedMin = marketStartMs ? (now - marketStartMs) / 1000 / 60 : 0;
+
+        if (elapsedMin < 0.5) {
+          const rawPrediction = timeAware.adjustedUp;
+          predictionOffset = { slug: marketSlug, offset: rawPrediction - 0.5 };
+          console.log(`[PredictionCalibrate] Market start (elapsed ${elapsedMin.toFixed(2)}m). Calibrating to 50%. Offset: ${(predictionOffset.offset * 100).toFixed(1)}%`);
+        } else {
+          predictionOffset = { slug: marketSlug, offset: 0 };
+          console.log(`[PredictionCalibrate] Mid-round or late detection (elapsed ${elapsedMin.toFixed(2)}m). No calibration.`);
+        }
+      }
+
+      // 应用偏移校准：强制从50%起始
+      const currentOffset = predictionOffset.slug === marketSlug ? predictionOffset.offset : 0;
+      const calibratedUp = Math.max(0.01, Math.min(0.99, timeAware.adjustedUp - currentOffset));
+      const calibratedDown = 1 - calibratedUp;
+
+      // 使用校准后的预测值
+      const finalUp = calibratedUp;
+      const finalDown = calibratedDown;
+
+      const edge = computeEdge({ modelUp: finalUp, modelDown: finalDown, marketYes: marketUp, marketNo: marketDown });
+
+      const rec = decide({ remainingMinutes: timeLeftMin, edgeUp: edge.edgeUp, edgeDown: edge.edgeDown, modelUp: finalUp, modelDown: finalDown });
 
 
       // 计算需要广播的数据
@@ -550,8 +612,9 @@ async function main() {
       const delta1m = lastClose !== null && close1mAgo !== null ? lastClose - close1mAgo : null;
       const delta3m = lastClose !== null && close3mAgo !== null ? lastClose - close3mAgo : null;
 
-      const pLong = timeAware?.adjustedUp ?? null;
-      const pShort = timeAware?.adjustedDown ?? null;
+      // 预测值来自校准后的模型
+      const pLong = finalUp ?? null;
+      const pShort = finalDown ?? null;
 
       // 检测形态
       const prevRsi = rsiSeries.length >= 2 ? rsiSeries[rsiSeries.length - 2] : null;
@@ -562,6 +625,68 @@ async function main() {
         rsiSlope,
         prevRsi
       });
+
+      // ========== 模拟交易逻辑 ==========
+
+      // 检测新回合
+      if (isNewMarket && marketSlug) {
+        onNewRound(marketSlug);
+      }
+
+      // 检查现有持仓是否需要止盈
+      const currentPositions = getPositions();
+      for (const pos of currentPositions) {
+        const exitSignal = checkExit({
+          position: pos,
+          currentMarketUp: marketUp,
+          currentMarketDown: marketDown
+        });
+
+        if (exitSignal) {
+          executeSell({
+            position: pos,
+            exitPrice: exitSignal.exitPrice,
+            reason: exitSignal.reason
+          });
+        }
+      }
+
+      // 检查入场条件
+      const entrySignal = checkEntry({
+        pattern: patternResult,
+        edge,
+        marketUp,
+        marketDown,
+        minutesLeft: timeLeftMin,
+        windowMinutes: CONFIG.candleWindowMinutes,
+        roundSlug: marketSlug
+      });
+
+      if (entrySignal) {
+        executeBuy({
+          side: entrySignal.side,
+          marketPrice: entrySignal.marketPrice,
+          edge: entrySignal.edge,
+          pattern: entrySignal.pattern,
+          roundSlug: marketSlug
+        });
+      }
+
+      // 检查是否需要结算 (剩余时间 < 10秒)
+      if (timeLeftMin !== null && timeLeftMin < 0.17 && marketSlug) {
+        // 尝试获取结算结果
+        // 注意：实际的决议结果需要从 Polymarket API 获取
+        // 这里暂时用价格比较作为模拟
+        const settlementResult = currentPrice > priceToBeat ? "UP" : "DOWN";
+        handleSettlement({
+          roundSlug: marketSlug,
+          settlementResult,
+          marketUp,
+          marketDown
+        });
+      }
+
+      // ========== 模拟交易逻辑结束 ==========
 
       // Broadcast all data to chart WebSocket clients (replaces console output)
       broadcastChartData({
@@ -597,8 +722,11 @@ async function main() {
     } catch (err) {
       // 网络错误静默处理，仅输出简短日志
       console.log(`[Error] ${err?.message ?? String(err)}`);
+      // 出错后多等待一会，避免刷屏和内存累积
+      await sleep(5000);
     }
 
+    // 正常等待
     await sleep(CONFIG.pollIntervalMs);
   }
 }

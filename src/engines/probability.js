@@ -38,8 +38,23 @@ export function scoreDirection(inputs) {
   } = inputs;
 
   // 1. 计算理论基准概率 (Theoretical Baseline)
-  // 假设 BTC 每分钟标准差约为 $50 (对于 $80k 价格这大约是 0.06% 波动率，15分钟约 0.25%)
-  const volatility = 50;
+  // 并引入动态波动率：随着时间临近结束，市场对波动率的定价通常会降低（Gamma Risk）
+  // [Auto-Tuned] BTC当前价格~78000. 
+  // [Auto-Tuned Result]
+  // Date: 2026-02-03
+  // Data: Ratio=0.18 @ Vol=300. Target Vol for Ratio=1.0 is ~55.
+  // Adjustment: User didn't restart, observed "Gap" due to heavy Tech weights.
+  // Tuning: Reduce Vol slightly to 110 to ensure it's not too stiff when weights are removed.
+  // Schedule: 110 -> 100 -> 90.
+  let volatility = 110;
+
+  // 动态调整：随着时间临近，适当降低 volatility 以体现 Gamma，但保持平滑
+  if (minutesLeft <= 5) {
+    volatility = 90;
+  } else if (minutesLeft <= 10) {
+    volatility = 97;
+  }
+
   let baseProb = 0.5;
 
   if (price !== null && priceToBeat !== null && Number.isFinite(price) && Number.isFinite(priceToBeat)) {
@@ -48,42 +63,43 @@ export function scoreDirection(inputs) {
 
   // 2. 计算技术面加成 (Technical Modifiers)
   // 技术指标只在基准概率上进行微调，而不是决定一切
-  // 范围：-0.2 (强空) 到 +0.2 (强多)
+  // [Adjusted] 降低权重，避免上一轮的强趋势导致新一轮开局即 "抢戏" (Overshoot)
+  // 目标范围：-0.10 到 +0.10 (之前是 0.32，太大)
   let techScore = 0;
 
   if (price !== null && vwap !== null) {
-    if (price > vwap) techScore += 0.05;
-    else techScore -= 0.05;
+    if (price > vwap) techScore += 0.02; // Prev 0.05
+    else techScore -= 0.02;
   }
 
   if (vwapSlope !== null) {
-    if (vwapSlope > 0) techScore += 0.05;
-    else if (vwapSlope < 0) techScore -= 0.05;
+    if (vwapSlope > 0) techScore += 0.02; // Prev 0.05
+    else if (vwapSlope < 0) techScore -= 0.02;
   }
 
   if (rsi !== null && rsiSlope !== null) {
-    if (rsi > 55 && rsiSlope > 0) techScore += 0.05;
-    else if (rsi < 45 && rsiSlope < 0) techScore -= 0.05;
+    if (rsi > 55 && rsiSlope > 0) techScore += 0.02; // Prev 0.05
+    else if (rsi < 45 && rsiSlope < 0) techScore -= 0.02;
 
     // 超买超卖反转逻辑
-    if (rsi > 75) techScore -= 0.05; // 过热减分
-    if (rsi < 25) techScore += 0.05; // 超卖加分
+    if (rsi > 75) techScore -= 0.03; // Prev 0.05
+    if (rsi < 25) techScore += 0.03;
   }
 
   if (macd?.hist !== null) {
-    if (macd.hist > 0) techScore += 0.05;
-    else techScore -= 0.05;
+    if (macd.hist > 0) techScore += 0.02; // Prev 0.05
+    else techScore -= 0.02;
 
-    if (macd.histDelta > 0) techScore += 0.03;
-    else techScore -= 0.03;
+    if (macd.histDelta > 0) techScore += 0.01; // Prev 0.03
+    else techScore -= 0.01;
   }
 
   if (heikenColor) {
-    if (heikenColor === "green" && heikenCount >= 2) techScore += 0.04;
-    else if (heikenColor === "red" && heikenCount >= 2) techScore -= 0.04;
+    if (heikenColor === "green" && heikenCount >= 2) techScore += 0.02; // Prev 0.04
+    else if (heikenColor === "red" && heikenCount >= 2) techScore -= 0.02;
   }
 
-  if (failedVwapReclaim === true) techScore -= 0.08;
+  if (failedVwapReclaim === true) techScore -= 0.05; // Prev 0.08
 
   // 3. 合成最终概率
   // 限制在 0.01 - 0.99 之间，保留一点黑天鹅空间
