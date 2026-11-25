@@ -1,6 +1,6 @@
 # M0_DAY_01 — 项目初始化与原始版本锁定
 
-日期：2026-11-25｜任务 PQSE-M0-D01｜状态：技术信息采集完成，归档及验收待完成
+日期：2026-11-25｜任务 PQSE-M0-D01｜状态：实施完成，待最终归档核查及合并
 
 ## 1. 学习目标
 
@@ -59,7 +59,7 @@ shasum -a 256 package.json package-lock.json
 
 ## 6. 学习复盘
 
-本次已实际执行 Git、环境采集、锁文件解析及校验命令。早期文档曾将 npm 版本误填为 Git 版本，终端证据显示 Git 为 2.55.0；归档前需确认已修正。交互式 zsh 中注释曾产生 command not found 错误，不影响已成功采集的命令结果。
+本次已实际执行 Git、环境采集、锁文件解析及校验命令。早期文档曾将 npm 版本误填为 Git 版本，终端证据显示 Git 为 2.55.0；已在环境记录中修正。交互式 zsh 中注释曾产生 command not found 错误，不影响已成功采集的命令结果。
 
 自测问题（供负责人复习，不计作新的考试成绩）：
 
@@ -74,3 +74,19 @@ shasum -a 256 package.json package-lock.json
 ## 7. 遗留事项与下一课
 
 下一课为原始架构分析：从 src/index.js 出发追踪模块依赖、状态及调用关系，区分事实与假设。Day 1 不执行安装、启动、发布、真实交易或正式优化；运行兼容性、功能及性能基线仍待验证。
+
+## 8. Git实践及最终审查记录
+
+- 独立分支：docs/pqse-m0-day01
+- 初始文档Commit：add6b473
+- 第二轮审查Commit：c1306269
+- Draft PR：https://github.com/JaydenLee2588/FKPolymarket15MinCryptTools/pull/1
+- 已实践Branch、Stage、Commit、Push及Draft PR工作流。
+- GitHub差异核查确认仅新增七份Markdown文档。
+- 原始业务代码、依赖及配置未修改。
+- 根项目两个文件与原始Tag哈希分别一致。
+- 全部十项SHA-256与基线清单一致。
+- DEC-011、DEC-012、DEC-013已获负责人批准。
+- SDK开发依赖数量经程序统计修正为27。
+- 最终归档核查及PR合并待完成。
+- 未执行依赖安装、系统启动、性能测试或真实交易。
