@@ -9,7 +9,7 @@
 | 仓库 | [FKPolymarket15MinCryptTools](https://github.com/JaydenLee2588/FKPolymarket15MinCryptTools) |
 | 当前阶段 | M0 — Original System Baseline |
 | 基线候选 SHA | `182e54fa20639b3650f6c6d78b8be8d72d7f135f` |
-| 基线 Tag | `pqse-baseline-v0.0`（用户已创建，完整指向及类型待核验） |
+| 基线 Tag | `pqse-baseline-v0.0`（已核验） |
 
 > 本文为原 V1.0 章程的 Markdown 整理版。核心决策已获批准；评分目标、周期及性能阈值仍为暂定规划，须经 M0 实测确认。
 
